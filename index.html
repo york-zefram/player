@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>ZEFRAM PLAYER NEO - iOS Optimized</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
+    <style>
+        :root {
+            --neon-blue: #00f2ff;
+            --neon-blue-glow: rgba(0, 242, 255, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.12);
+            --metal-grad: conic-gradient(from 180deg at 50% 50%, #222, #555, #888, #555, #222);
+            --trans: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+            --font-main: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        * { -webkit-tap-highlight-color: transparent; outline: none; box-sizing: border-box; }
+
+        body {
+            background-color: #030305;
+            color: #fff; margin: 0; padding: 10px;
+            font-family: var(--font-main);
+            display: flex; justify-content: center; align-items: center; min-height: 100vh;
+            overflow: hidden;
+            touch-action: none;
+            position: fixed; width: 100%; height: 100%;
+        }
+
+        .player-canvas {
+            width: 100%; max-width: 380px; height: 92vh; max-height: 800px;
+            background: rgba(15, 15, 25, 0.6); 
+            backdrop-filter: blur(40px) saturate(160%);
+            -webkit-backdrop-filter: blur(40px) saturate(160%);
+            border: 1px solid var(--glass-border); 
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 40px;
+            padding: 20px 25px; 
+            box-shadow: 0 40px 80px rgba(0,0,0,0.9), inset 0 0 30px rgba(255, 255, 255, 0.02);
+            display: flex; flex-direction: column;
+            position: relative;
+        }
+
+        .dot-fs-trigger {
+            position: absolute; top: 15px; right: 15px; width: 44px; height: 44px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; z-index: 1001; background: transparent; border: none;
+        }
+        .dot-inner {
+            width: 7px; height: 7px; background: #fff; border-radius: 50%;
+            box-shadow: 0 0 10px #fff, 0 0 20px #fff; transition: var(--trans);
+        }
+
+        .header-title { 
+            text-align: center; font-size: 20px; font-weight: 900; letter-spacing: 3px; 
+            color: var(--neon-blue); margin-bottom: 15px; text-transform: uppercase; flex-shrink: 0;
+            animation: slow-pulse-glow 5s infinite ease-in-out;
+        }
+        @keyframes slow-pulse-glow {
+            0%, 100% { opacity: 0.3; text-shadow: 0 0 2px var(--neon-blue); }
+            50% { opacity: 1; text-shadow: 0 0 20px var(--neon-blue), 0 0 40px var(--neon-blue); }
+        }
+
+        .meta-area { display: flex; align-items: center; gap: 12px; flex-shrink: 0; margin-bottom: 10px; height: 100px; }
+        .art-box { 
+            width: 75px; height: 75px; border-radius: 12px; background: #000; 
+            border: 1.5px solid rgba(255, 255, 255, 0.1); 
+            overflow: hidden; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+        }
+        .art-box img { width: 100%; height: 100%; object-fit: contain; }
+        
+        .info-col { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
+
+        .marquee-container { width: 100%; overflow: hidden; white-space: nowrap; position: relative; margin: 2px 0; }
+        .marquee-inner { display: inline-flex; width: max-content; align-items: center; }
+        /* スクロール用パディングはJavaScriptで動的に付与 */
+        .marquee-content { display: inline-block; white-space: nowrap; }
+        .title-style { font-size: 18px; font-weight: 900; color: #fff; }
+        .artist-style { font-size: 13px; font-weight: 700; color: var(--neon-blue); opacity: 0.8; }
+        .animate-loop { animation: seamless-marquee 25s linear infinite; }
+        @keyframes seamless-marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+
+        #m-time { font-family: var(--font-main); font-size: 18px; font-weight: 900; margin-top: 8px; color: #fff; letter-spacing: 1px; font-variant-numeric: tabular-nums; }
+
+        .btn-unified { 
+            background: rgba(255,255,255,0.03); border: 1px solid var(--neon-blue); 
+            color: var(--neon-blue); font-weight: 800; cursor: pointer; transition: var(--trans); 
+            display: inline-flex; align-items: center; justify-content: center; 
+            text-shadow: 0 0 5px var(--neon-blue-glow); box-shadow: 0 0 12px rgba(0, 242, 255, 0.1); 
+            text-align: center; line-height: 1;
+        }
+        .btn-unified:active { transform: scale(0.95); background: rgba(0, 242, 255, 0.2); }
+        .btn-select { border-radius: 10px; height: 32px; width: 55px; font-size: 11px; border: 1px solid rgba(0, 242, 255, 0.5); }
+
+        .seek-container { margin: 5px 0 20px 0; flex-shrink: 0; position: relative; padding: 0 25px; }
+        .tag-lane { height: 30px; position: relative; width: 100%; }
+        .ab-tag { 
+            position: absolute; width: 34px; height: 34px; border-radius: 50%; 
+            background: rgba(0, 242, 255, 0.05); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
+            border: 1.2px solid var(--neon-blue); display: flex; align-items: center; justify-content: center; 
+            font-size: 16px; font-weight: 900; top: 50%; transform: translate(-50%, -50%); 
+            color: var(--neon-blue); z-index: 100; box-shadow: 0 0 15px var(--neon-blue-glow); cursor: pointer;
+        }
+
+        .ab-jump-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; gap: 10px; }
+        #ab-txt { 
+            font-family: var(--font-main); color: var(--neon-blue); font-weight: 900; font-size: 20px; 
+            min-width: 160px; text-align: center; text-shadow: 0 0 15px var(--neon-blue-glow); 
+            font-variant-numeric: tabular-nums; letter-spacing: 1px;
+        }
+
+        .main-lane { height: 40px; position: relative; display: flex; align-items: center; cursor: pointer; touch-action: none; }
+        .main-lane-bg { position: absolute; width: 100%; height: 10px; background: rgba(255,255,255,0.08); border-radius: 5px; z-index: 1; }
+        .v-marker { position: absolute; width: 3px; height: 20px; background: #fff; z-index: 20; top: 50%; transform: translate(-50%, -50%); pointer-events: none; }
+        .bar-y { position: absolute; height: 6px; background: var(--neon-blue); z-index: 3; box-shadow: 0 0 20px var(--neon-blue); border-radius: 3px; }
+        .bar-w { position: absolute; height: 6px; background: #fff; z-index: 3; opacity: 0.2; border-radius: 3px; }
+        .head-knob { position: absolute; width: 22px; height: 22px; border-radius: 50%; background: #fff; z-index: 30; transform: translateX(-50%); box-shadow: 0 0 15px #fff; pointer-events: none; }
+        
+        .control-grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 15px; flex: 1; min-height: 280px; margin-bottom: 10px; }
+        .play-col { display: flex; flex-direction: column; align-items: center; justify-content: space-around; padding: 10px 0; }
+        
+        .metal-btn-wrap { 
+            aspect-ratio: 1/1; width: 85px; border-radius: 50%; background: var(--metal-grad); padding: 3px; 
+            box-shadow: 0 15px 30px rgba(0,0,0,0.6); cursor: pointer; position: relative; overflow: hidden; 
+            display: flex; align-items: center; justify-content: center; transition: var(--trans);
+        }
+        #p-btn { width: 110px; border: 1.5px solid var(--neon-blue); }
+        #p-btn.playing::before { 
+            content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; 
+            background: conic-gradient(transparent, transparent, var(--neon-blue), transparent); 
+            animation: rotate-glow 2s linear infinite; z-index: 0; 
+        }
+        @keyframes rotate-glow { 100% { transform: rotate(360deg); } }
+        .metal-btn-inner { width: 100%; height: 100%; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle, #252525, #050505); position: relative; z-index: 1; }
+        .metal-btn-inner svg { fill: var(--neon-blue); filter: drop-shadow(0 0 8px var(--neon-blue-glow)); }
+        
+        .tempo-panel { background: rgba(255, 255, 255, 0.04); border-radius: 30px; padding: 18px; border: 1px solid var(--glass-border); display: flex; flex-direction: column; justify-content: space-between; height: 100%; backdrop-filter: blur(10px); }
+        .tempo-label { font-size: 11px; color: var(--neon-blue); font-weight: 800; letter-spacing: 2px; display: block; margin-bottom: -2px; }
+        .tempo-val-wrapper { color: #fff; font-size: 20px; font-weight: 900; }
+        .tempo-controls { flex: 1; display: flex; gap: 15px; align-items: center; justify-content: center; position: relative; }
+        .slider-wrapper { position: relative; height: 100%; width: 40px; display: flex; justify-content: center; align-items: center; }
+        .tempo-lane-bg { position: absolute; height: 160px; width: 6px; background: rgba(255,255,255,0.06); border-radius: 4px; z-index: 1; }
+        .t-marker { position: absolute; height: 2px; width: 18px; background: rgba(255,255,255,0.4); z-index: 2; left: 50%; transform: translateX(-50%); }
+        .v-slider { -webkit-appearance: none; appearance: none; position: absolute; top: 50%; left: 50%; width: 160px; height: 40px; background: transparent; outline: none; transform: translate(-50%, -50%) rotate(-90deg); margin: 0; z-index: 10; cursor: pointer; }
+        .v-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 0 15px #fff; }
+        .btn-reset-glass { width: 100%; padding: 12px; border-radius: 14px; font-size: 11px; font-weight: 700; letter-spacing: 2px; border: 1px solid rgba(255, 255, 255, 0.1); }
+        .btn-step-iso { width: 46px; height: 46px; border-radius: 14px; font-size: 24px; border: 1px solid rgba(0, 242, 255, 0.3); }
+        .btn-cyber-large { border-radius: 16px; padding: 15px 0; flex: 1; font-size: 16px; }
+    </style>
+</head>
+<body>
+
+<div class="player-canvas">
+    <button class="dot-fs-trigger" id="dot-btn">
+        <div class="dot-inner"></div>
+    </button>
+    <div class="header-title">ZEFRAM PLAYER NEO</div>
+    <div class="meta-area">
+        <div id="art-box" class="art-box"></div>
+        <div class="info-col">
+            <div class="marquee-container"><div id="wrap-tit" class="marquee-inner"><span id="m-tit" class="marquee-content title-style">No File</span></div></div>
+            <div class="marquee-container"><div id="wrap-art" class="marquee-inner"><span id="m-art" class="marquee-content artist-style">Select track</span></div></div>
+            <div id="m-time">00:00 / 00:00</div>
+        </div>
+        <button class="btn-unified btn-select" id="file-trigger">FILE</button>
+        <input type="file" id="f-in" hidden accept=".mp3,.m4a,.wav,audio/*">
+    </div>
+    <div class="seek-container" id="seek-cont">
+        <div class="tag-lane"><div class="ab-tag" id="tag-a" style="left:0" onmousedown="dragStart(event, 'A')" ontouchstart="dragStart(event, 'A')">A</div></div>
+        <div class="main-lane" id="main-lane-touch" onmousedown="dragStart(event, 'P')" ontouchstart="dragStart(event, 'P')">
+            <div class="main-lane-bg"><div id="v-a-mid" class="v-marker" style="left:0"></div><div id="v-b-mid" class="v-marker" style="left:100%"></div></div>
+            <div id="bar-y" class="bar-y"></div><div id="bar-w" class="bar-w"></div><div id="head-knob" class="head-knob"></div>
+        </div>
+        <div class="tag-lane"><div class="ab-tag" id="tag-b" style="left:100%" onmousedown="dragStart(event, 'B')" ontouchstart="dragStart(event, 'B')">B</div></div>
+    </div>
+    <div class="ab-jump-row">
+        <button class="btn-unified btn-cyber-large" onclick="setPoint('A')">A ▶</button>
+        <div id="ab-txt">00:00 - 00:00</div>
+        <button class="btn-unified btn-cyber-large" onclick="setPoint('B')">◀ B</button>
+    </div>
+    <div class="control-grid">
+        <div class="play-col">
+            <div class="metal-btn-wrap" onclick="jump('A')"><div class="metal-btn-inner"><svg width="40" height="40" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></div></div>
+            <div class="metal-btn-wrap" id="p-btn"><div class="metal-btn-inner"><svg id="p-svg" width="40" height="40" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div></div>
+        </div>
+        <div class="tempo-panel">
+            <div class="tempo-header"><span class="tempo-label">TEMPO</span><div class="tempo-val-wrapper"><span id="t-txt">+0</span>%</div></div>
+            <div class="tempo-controls" id="tempo-ctrl-area">
+                <div class="btn-step-col" style="display:flex; flex-direction:column; gap:20px;">
+                    <button class="btn-unified btn-step-iso" onmousedown="startAdj(0.01)" ontouchstart="startAdj(0.01)" onmouseup="stopAdj()" ontouchend="stopAdj()">+</button>
+                    <button class="btn-unified btn-step-iso" style="padding-bottom:4px;" onmousedown="startAdj(-0.01)" ontouchstart="startAdj(-0.01)" onmouseup="stopAdj()" ontouchend="stopAdj()">-</button>
+                </div>
+                <div class="slider-wrapper">
+                    <div class="tempo-lane-bg" id="t-lane-bg"><div class="t-marker" style="top:0"></div><div class="t-marker" style="top:50%; transform:translate(-50%,-50%)"></div><div class="t-marker" style="bottom:0"></div></div>
+                    <input type="range" class="v-slider" id="t-sld" min="0.5" max="1.5" step="0.01" value="1.0">
+                </div>
+            </div>
+            <button class="btn-unified btn-reset-glass" style="margin-top:10px;" onclick="resT()">RESET</button>
+        </div>
+    </div>
+</div>
+<audio id="audio" playsinline></audio>
+
+<script>
+    const audio = document.getElementById('audio'), pBtn = document.getElementById('p-btn'), pSvg = document.getElementById('p-svg'), tSld = document.getElementById('t-sld');
+    let tA = 0, tB = 0, dTarget = null, adjTimer = null;
+    let isFsActive = false;
+
+    function requestFS() {
+        const el = document.documentElement;
+        if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+        else if (el.requestFullscreen) el.requestFullscreen();
+        isFsActive = true;
+    }
+
+    function toggleFS() {
+        const isFull = document.webkitFullscreenElement || document.fullscreenElement;
+        if (!isFull) requestFS();
+        else {
+            if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+            else if (document.exitFullscreen) document.exitFullscreen();
+            isFsActive = false;
+        }
+    }
+
+    document.getElementById('dot-btn').onclick = (e) => { e.stopPropagation(); toggleFS(); };
+    document.getElementById('file-trigger').onclick = (e) => { e.stopPropagation(); document.getElementById('f-in').click(); };
+
+    document.getElementById('f-in').onchange = (e) => {
+        const file = e.target.files[0]; if(!file) return;
+        audio.pause();
+        audio.src = URL.createObjectURL(file);
+        audio.load(); 
+
+        // 初期表示
+        setupSeamlessLoop('wrap-tit', 'm-tit', file.name, 'title-style');
+        setupSeamlessLoop('wrap-art', 'm-art', "Loading...", 'artist-style');
+        resT(); 
+        
+        audio.onloadedmetadata = () => { 
+            tA = 0; 
+            tB = audio.duration;
+            audio.currentTime = 0; 
+            updateUI(); 
+            resizeSlider(); 
+        };
+
+        window.jsmediatags.read(file, { onSuccess: (tag) => {
+            setupSeamlessLoop('wrap-tit', 'm-tit', tag.tags.title || file.name, 'title-style');
+            setupSeamlessLoop('wrap-art', 'm-art', tag.tags.artist || "Unknown Artist", 'artist-style');
+            if (tag.tags.picture) {
+                const { data, format } = tag.tags.picture;
+                let b64 = ""; for (let i = 0; i < data.length; i++) b64 += String.fromCharCode(data[i]);
+                document.getElementById('art-box').innerHTML = `<img src="data:${format};base64,${window.btoa(b64)}">`;
+            }
+        }});
+    };
+
+    // 判定付きスクロール関数
+    function setupSeamlessLoop(innerId, contentId, text, extraClass) {
+        const inner = document.getElementById(innerId); 
+        const container = inner.parentElement;
+        inner.classList.remove('animate-loop'); 
+        inner.innerHTML = '';
+        const mainSpan = document.createElement('span'); 
+        mainSpan.className = `marquee-content ${extraClass}`;
+        mainSpan.id = contentId; 
+        mainSpan.innerText = text; 
+        inner.appendChild(mainSpan);
+        
+        // 文字がはみ出しているか判定
+        setTimeout(() => { 
+            if (mainSpan.offsetWidth > container.offsetWidth) { 
+                // はみ出している場合のみスクロール開始
+                mainSpan.style.paddingRight = "80px"; // 余白を付ける
+                const clone = mainSpan.cloneNode(true); 
+                inner.appendChild(clone); 
+                inner.classList.add('animate-loop'); 
+            } else {
+                // 収まる場合はパディングなしで固定
+                mainSpan.style.paddingRight = "0";
+            }
+        }, 100);
+    }
+
+    function setPoint(type) { if(!audio.duration) return; if(type === 'A') tA = audio.currentTime; else if(type === 'B') tB = audio.currentTime; updateUI(); }
+    
+    function initDefaultPoints() {
+        tA = 0;
+        tB = 100;
+        updateUI();
+    }
+
+    audio.ontimeupdate = () => {
+        const cur = audio.currentTime, dur = audio.duration || 1;
+        document.getElementById('m-time').textContent = `${fT(cur)} / ${fT(dur)}`; 
+        document.getElementById('head-knob').style.left = (cur/dur*100)+'%'; 
+        updateUI();
+        const start = Math.min(tA, tB), end = Math.max(tA, tB);
+        if (Math.abs(tA-tB) > 0.1 && (cur >= end - 0.01)) audio.currentTime = start;
+    };
+
+    function dragStart(e, type) { dTarget = type; handleMove(e); e.preventDefault(); }
+    function handleMove(e) {
+        if(!dTarget || !audio.duration) return;
+        const rect = document.getElementById('seek-cont').getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const x = clientX - rect.left - 25;
+        const r = Math.max(0, Math.min(1, x / (rect.width - 50)));
+        if(dTarget === 'A') { tA = r * audio.duration; audio.currentTime = tA; } 
+        else if(dTarget === 'B') { tB = r * audio.duration; } 
+        else { audio.currentTime = r * audio.duration; }
+        updateUI();
+    }
+
+    function updateUI() {
+        const dur = audio.duration || 100, cur = audio.currentTime; 
+        const s = Math.min(tA, tB), e = Math.max(tA, tB);
+        const posA = (tA/dur*100);
+        const posB = (tB/dur*100);
+        
+        document.getElementById('tag-a').style.left = posA + '%'; 
+        document.getElementById('tag-b').style.left = posB + '%';
+        document.getElementById('v-a-mid').style.left = (Math.min(posA, posB)) + '%';
+        document.getElementById('v-b-mid').style.left = (Math.max(posA, posB)) + '%';
+        
+        document.getElementById('bar-y').style.left = (s/dur*100)+'%'; 
+        document.getElementById('bar-y').style.width = (audio.duration && cur > s ? (Math.min(cur, e)-s)/dur*100 : 0)+'%';
+        document.getElementById('bar-w').style.left = (Math.max(cur, s)/dur*100)+'%'; 
+        document.getElementById('bar-w').style.width = (e > cur ? (e-Math.max(cur, s))/dur*100 : 0)+'%';
+        
+        document.getElementById('ab-txt').textContent = audio.duration ? `${fT(tA)} - ${fT(tB)}` : "00:00 - End";
+    }
+
+    window.addEventListener('mousemove', handleMove); 
+    window.addEventListener('touchmove', handleMove, {passive: false});
+    window.addEventListener('mouseup', () => dTarget = null); 
+    window.addEventListener('touchend', () => dTarget = null);
+
+    tSld.oninput = () => { 
+        audio.playbackRate = tSld.value; 
+        document.getElementById('t-txt').textContent = (tSld.value>=1?'+':'')+Math.round((tSld.value-1)*100); 
+    };
+
+    function adjT(v) { tSld.value = (parseFloat(tSld.value)+v).toFixed(2); tSld.oninput(); }
+    function startAdj(v) { adjT(v); adjTimer = setInterval(() => adjT(v), 50); }
+    function stopAdj() { clearInterval(adjTimer); }
+    function resT() { tSld.value = 1.0; tSld.oninput(); }
+    function jump(m) { audio.currentTime = tA; }
+
+    pBtn.onclick = () => {
+        if(audio.paused) { 
+            audio.play(); 
+            pBtn.classList.add('playing'); 
+            pSvg.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>'; 
+        } else { 
+            audio.pause(); 
+            pBtn.classList.remove('playing'); 
+            pSvg.innerHTML = '<path d="M8 5v14l11-7z"/>'; 
+        }
+    };
+    function fT(s) { return `${Math.floor(s/60).toString().padStart(2,'0')}:${Math.floor(s%60).toString().padStart(2,'0')}`; }
+    function resizeSlider() { 
+        const area = document.getElementById('tempo-ctrl-area'); 
+        if(area) { tSld.style.width = area.offsetHeight + 'px'; document.getElementById('t-lane-bg').style.height = area.offsetHeight + 'px'; } 
+    }
+    window.onload = () => { initDefaultPoints(); resizeSlider(); };
+    window.onresize = resizeSlider;
+</script>
+</body>
+</html>
